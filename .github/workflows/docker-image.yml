@@ -1,0 +1,44 @@
+name: Docker Image CI
+
+on:
+  push:
+    tags:
+       - 'v*.*.*'
+
+jobs:
+
+  build:
+    
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: ARM Action
+      # You may pin to the exact commit or the version.
+      # uses: apoorv33/azure-arm@530cd444c556449669204b43102e8a9f9277025a
+      uses: apoorv33/azure-arm@V6
+      with:
+        # Copy this script and modify with your Resource Group, Location and Template Location az group create --location $REPLACE_THIS_WITH_LOCATION --name $REPLACE_THIS_WITH_RESOURCE_GROUP az group deployment create --resource-group $REPLACE_THIS_WITH_RESOURCE_GROUP --template-file $REPLACE_THIS_WITH_TEMPLATE_FILE
+        azcliversion: default # optional, default is latest
+    - name: Docker Login
+      run: docker login -username=${{ secrets.DOCKERHUB_LOGIN_USERNAME }} ${{ DOCKERHUB_URL }} -p ${{ secrets.DOCKERHUB_LOGIN_PASSWORD }}
+    - name: Setup Node.js
+      uses: actions/setup-node@v2.3.0
+      with:
+        version: 14.x
+    - name: Build Frontend Source
+      run: |
+        cd gerapy/client
+        npm install -g yarn
+        yarn 
+        yarn build
+    - name: Build and Push the Docker Image
+      run: |
+        tag=${GITHUB_REF:11}
+        echo "Build Tag '$tag'"
+        docker build -t ${{ DOCKERHUB_URL }}/studyx/gerapy:$tag .
+        docker push ${{ DOCKERHUB_URL }}/studyx/gerapy:$tag
+        regex='^([0-9]+\.){0,2}(\*|[0-9]+)$'
+        if [[ $tag =~ $regex ]]; then
+          echo "Build Stable Version '$tag'"
+          docker push ${{ DOCKERHUB_URL }}/studyx/gerapy:$tag
+        fi
